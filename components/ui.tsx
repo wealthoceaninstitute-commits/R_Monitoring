@@ -30,7 +30,8 @@ export function RaSelect({ ras, value, onChange, allowUnassigned = true, classNa
 }) {
   return (
     <select className={`input w-auto min-w-[190px] ${className}`} value={value} onChange={(e) => onChange(e.target.value)} aria-label="Referral agent">
-      <option value="">All referral agents</option>
+      <option value="">All clients</option>
+      {allowUnassigned && <option value="assigned">Assigned clients only</option>}
       {allowUnassigned && <option value="unassigned">Unassigned clients</option>}
       {ras.map((r) => (
         <option key={r.id} value={r.id}>{r.name}{r.admin_name ? ` · ${r.admin_name}` : ""}{r.is_active ? "" : " (disabled)"}</option>
