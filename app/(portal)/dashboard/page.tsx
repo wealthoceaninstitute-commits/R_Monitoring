@@ -27,7 +27,7 @@ export default function Dashboard() {
   if (!d.period) return (
     <>
       <PageHeader title="Dashboard" />
-      <div className="card"><Empty>No reports have been uploaded yet.{user.role === "MASTER" && <> <Link className="text-navy-700 underline" href="/uploads">Upload this month&apos;s files</Link> to begin.</>}</Empty></div>
+      <div className="card"><Empty>No reports have been uploaded yet.{user.role !== "RA" && <> <Link className="text-navy-700 underline" href="/uploads">Upload this month&apos;s files</Link> to begin.</>}</Empty></div>
     </>
   );
 
