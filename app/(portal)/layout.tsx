@@ -11,7 +11,7 @@ const NAV = [
   { href: "/clients", label: "Clients", roles: ["MASTER", "ADMIN", "RA"] },
   { href: "/transactions", label: "Transactions", roles: ["MASTER", "ADMIN", "RA"] },
   { href: "/team", label: "Team", roles: ["MASTER", "ADMIN"] },
-  { href: "/uploads", label: "Monthly upload", roles: ["MASTER"] },
+  { href: "/uploads", label: "Monthly upload", roles: ["MASTER", "ADMIN"] },
 ];
 const ROLE_LABEL = { MASTER: "Master", ADMIN: "Admin", RA: "Referral agent" } as const;
 
