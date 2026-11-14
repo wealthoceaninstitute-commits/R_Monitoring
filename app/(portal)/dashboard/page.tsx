@@ -22,7 +22,7 @@ export default function Dashboard() {
   if (error) return <ErrorNote error={error} />;
   if (!d) return <Empty>Loading…</Empty>;
   const t = d.totals;
-  const who = ra === "unassigned" ? "Unassigned clients" : ra ? ras.find((r) => String(r.id) === ra)?.name : user.role === "RA" ? "Your clients" : user.role === "ADMIN" ? "Your team" : "Whole book";
+  const who = ra === "unassigned" ? "Unassigned clients" : ra === "assigned" ? "Assigned clients only" : ra ? ras.find((r) => String(r.id) === ra)?.name : user.role === "RA" ? "Your clients" : user.role === "ADMIN" ? "Your team + unassigned clients" : "Whole book";
 
   if (!d.period) return (
     <>
