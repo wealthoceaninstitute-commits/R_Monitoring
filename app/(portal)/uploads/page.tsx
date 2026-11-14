@@ -20,7 +20,7 @@ export default function Uploads() {
   const [history, setHistory] = useState<any[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => { if (user.role !== "MASTER") router.replace("/dashboard"); }, [user, router]);
+  useEffect(() => { if (user.role === "RA") router.replace("/dashboard"); }, [user, router]);
   const load = useCallback(() => { api("/uploads").then(setHistory).catch((e) => setError(e.message)); }, []);
   useEffect(load, [load]);
 
