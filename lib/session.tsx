@@ -10,8 +10,14 @@ export type Session = {
   periods: string[];
   period: string | null;
   setPeriod: (p: string) => void;
+  /** AUM snapshot dates on file (newest first) and the one being viewed */
+  aumDates: string[];
+  asOn: string | null;
+  setAsOn: (d: string) => void;
   ras: Ra[];
   reloadRas: () => void;
+  /** re-read months and AUM dates after an upload or delete */
+  reloadPeriods: () => void;
 };
 
 export const SessionContext = createContext<Session | null>(null);
