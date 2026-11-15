@@ -2,27 +2,32 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { api, qs } from "@/lib/api";
-import { count, money, monthLabel } from "@/lib/format";
+import { count, dateLabel, money, monthLabel } from "@/lib/format";
 import { useSession } from "@/lib/session";
 import { Empty, ErrorNote, PageHeader, RaSelect } from "@/components/ui";
 
 export default function Clients() {
-  const { user, period, ras } = useSession();
+  const { user, period, asOn, ras } = useSession();
   const canAssign = user.role !== "RA";
   const [ra, setRa] = useState("");
   const [q, setQ] = useState("");
+  const [status, setStatus] = useState("");
   const [items, setItems] = useState<any[] | null>(null);
   const [sel, setSel] = useState<Set<number>>(new Set());
   const [target, setTarget] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => { const r = new URLSearchParams(window.location.search).get("ra"); if (r) setRa(r); }, []);
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.get("ra")) setRa(sp.get("ra")!);
+    if (sp.get("status")) setStatus(sp.get("status")!);
+  }, []);
 
   const load = useCallback(() => {
     setError(null);
-    api("/investors" + qs({ period, ra_id: ra })).then((r) => { setItems(r.items); setSel(new Set()); }).catch((e) => setError(e.message));
-  }, [period, ra]);
+    api("/investors" + qs({ period, as_on: asOn, ra_id: ra, status })).then((r) => { setItems(r.items); setSel(new Set()); }).catch((e) => setError(e.message));
+  }, [period, asOn, ra, status]);
   useEffect(load, [load]);
 
   const shown = useMemo(() => {
@@ -43,8 +48,13 @@ export default function Clients() {
 
   return (
     <>
-      <PageHeader title="Clients" sub={<>{count(shown.length)} clients · AUM {money(tot.aum)} · {monthLabel(period)}</>}>
+      <PageHeader title="Clients" sub={<>{count(shown.length)} clients · AUM {money(tot.aum)}{asOn ? ` as on ${dateLabel(asOn)}` : ""} · transactions of {monthLabel(period)}</>}>
         <input className="input w-56" placeholder="Search name or PAN" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search clients" />
+        <select className="input w-auto" value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Investment status">
+          <option value="">Invested and not invested</option>
+          <option value="holding">Invested</option>
+          <option value="not_invested">Not invested yet</option>
+        </select>
         {canAssign && <RaSelect ras={ras} value={ra} onChange={setRa} />}
       </PageHeader>
       <ErrorNote error={error} />
@@ -65,7 +75,7 @@ export default function Clients() {
 
       <div className="card overflow-hidden">
         {!items ? <Empty>Loading…</Empty> : shown.length === 0 ? (
-          <Empty>{items.length ? "No client matches that search." : user.role === "RA" ? "No clients have been assigned to you yet." : "No clients here yet."}</Empty>
+          <Empty>{items.length ? "No client matches that search." : user.role === "RA" ? "No clients here. Clients are assigned to you by your admin." : "No clients here yet."}</Empty>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -83,7 +93,7 @@ export default function Clients() {
                     <td className="td font-medium">
                       <Link className="text-navy-700 hover:underline" href={`/clients/${i.id}`}>{i.name}</Link>
                       {i.namesake && canAssign && <span className="chip ml-2 bg-warn/10 text-warn" title="Another client has the same name - confirm the PAN on the client page">same name</span>}
-                      {!i.active && <span className="chip ml-2 bg-paper text-ink-faint">no holding</span>}
+                      {!i.active && <span className="chip ml-2 bg-warn/10 text-warn" title={i.registered ? "Registered on E-Wealth, no holding on this AUM date" : "No holding on this AUM date"}>not invested</span>}
                     </td>
                     <td className="td font-mono text-xs text-ink-soft">{i.pan ?? "–"}</td>
                     {canAssign && <td className="td">{i.ra_name ?? <span className="text-ink-faint">Unassigned</span>}</td>}
