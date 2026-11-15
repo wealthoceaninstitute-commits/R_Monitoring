@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { api, getToken, setToken } from "@/lib/api";
-import { monthLabel } from "@/lib/format";
+import { dateLabel, monthLabel } from "@/lib/format";
 import { Ra, SessionContext, User } from "@/lib/session";
 
 const NAV = [
@@ -21,13 +21,17 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   const [user, setUser] = useState<User | null>(null);
   const [periods, setPeriods] = useState<string[]>([]);
   const [period, setPeriod] = useState<string | null>(null);
+  const [aumDates, setAumDates] = useState<string[]>([]);
+  const [asOn, setAsOn] = useState<string | null>(null);
   const [ras, setRas] = useState<Ra[]>([]);
 
   const reloadRas = useCallback(() => { api<Ra[]>("/ras").then(setRas).catch(() => {}); }, []);
   const reloadPeriods = useCallback(() => {
-    api<{ periods: string[]; latest: string | null }>("/periods").then((p) => {
+    api<{ periods: string[]; latest: string | null; aum_dates: string[]; latest_aum: string | null }>("/periods").then((p) => {
       setPeriods(p.periods);
       setPeriod((cur) => (cur && p.periods.includes(cur) ? cur : p.latest));
+      setAumDates(p.aum_dates);
+      setAsOn((cur) => (cur && p.aum_dates.includes(cur) ? cur : p.latest_aum));
     }).catch(() => {});
   }, []);
 
@@ -42,7 +46,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   const nav = NAV.filter((n) => n.roles.includes(user.role));
 
   return (
-    <SessionContext.Provider value={{ user, periods, period, setPeriod, ras, reloadRas }}>
+    <SessionContext.Provider value={{ user, periods, period, setPeriod, aumDates, asOn, setAsOn, ras, reloadRas, reloadPeriods }}>
       <div className="min-h-screen lg:grid lg:grid-cols-[232px_1fr]">
         <aside className="flex flex-col bg-navy-900 text-white lg:sticky lg:top-0 lg:h-screen">
           <div className="px-5 pb-2 pt-5 text-sm font-semibold tracking-wide">Referral Portal</div>
@@ -67,10 +71,15 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
         <div className="min-w-0">
           <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-line bg-paper/90 px-5 py-3 backdrop-blur lg:px-8">
             <div className="text-xs text-ink-faint lg:hidden">{user.name} · {ROLE_LABEL[user.role]}</div>
-            <div className="ml-auto flex items-center gap-2">
-              <label htmlFor="period" className="text-xs font-medium text-ink-soft">Month</label>
+            <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+              <label htmlFor="ason" className="text-xs font-medium text-ink-soft">AUM as on</label>
+              <select id="ason" className="input w-auto" value={asOn ?? ""} onChange={(e) => setAsOn(e.target.value)} disabled={!aumDates.length}>
+                {!aumDates.length && <option value="">No AUM yet</option>}
+                {aumDates.map((d) => <option key={d} value={d}>{dateLabel(d)}</option>)}
+              </select>
+              <label htmlFor="period" className="ml-2 text-xs font-medium text-ink-soft">Transactions</label>
               <select id="period" className="input w-auto" value={period ?? ""} onChange={(e) => setPeriod(e.target.value)} disabled={!periods.length}>
-                {!periods.length && <option value="">No data yet</option>}
+                {!periods.length && <option value="">No transactions yet</option>}
                 {periods.map((p) => <option key={p} value={p}>{monthLabel(p)}</option>)}
               </select>
               <button className="btn-ghost lg:hidden" onClick={() => { setToken(null); router.replace("/login"); }}>Sign out</button>
