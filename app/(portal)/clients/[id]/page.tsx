@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { api } from "@/lib/api";
-import { compact, money, monthLabel, pct } from "@/lib/format";
+import { compact, dateLabel, money, monthLabel, pct } from "@/lib/format";
 import { useSession } from "@/lib/session";
 import { Empty, ErrorNote, PageHeader, Stat } from "@/components/ui";
 import { TxnTable } from "@/components/TxnTable";
@@ -12,7 +12,7 @@ const TABS = [["", "All"], ["PURCHASE", "Purchases"], ["REDEMPTION", "Redemption
 
 export default function ClientDetail() {
   const { id } = useParams<{ id: string }>();
-  const { user, period } = useSession();
+  const { user, period, asOn } = useSession();
   const [c, setC] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState("");
@@ -28,7 +28,10 @@ export default function ClientDetail() {
   }
 
   if (!c) return error ? <ErrorNote error={error} /> : <Empty>Loading…</Empty>;
-  const m = c.months.find((x: any) => x.period === period) ?? c.months.find((x: any) => x.active) ?? c.months[0];
+  const snap = c.snapshots.find((x: any) => x.as_on === asOn);
+  const flow = c.months.find((x: any) => x.period === period);
+  const z = { amount: 0, count: 0 };
+  const f = flow ?? { purchase: z, redemption: z, rejection: z };
   const txns = c.transactions.filter((t: any) => !tab || t.kind === tab);
 
   return (
@@ -51,40 +54,64 @@ export default function ClientDetail() {
         </div>
       )}
 
-      {m && (
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <Stat label={`AUM · ${monthLabel(m.period)}`} value={compact(m.aum_total)} hint={money(m.aum_total)} />
-          <Stat label="Invested" value={compact(m.inv_total)} hint={money(m.inv_total)} />
-          <Stat label="Gain / loss" value={compact(m.gain)} tone={m.gain >= 0 ? "up" : "down"} hint={pct(m.gain, m.inv_total)} />
-          <Stat label="Month activity" value={compact(m.purchase.amount - m.redemption.amount)} hint={`${m.purchase.count} bought · ${m.redemption.count} redeemed · ${m.rejection.count} rejected`} />
-        </div>
+      {!snap && (
+        <p className="mb-4 rounded-lg border border-warn/25 bg-warn/5 px-3 py-2 text-sm text-warn">
+          {c.snapshots.length ? `No holding in the AUM report as on ${dateLabel(asOn)}.` : "Not invested yet: this client is not in any AUM report."}
+          {c.registrations.length > 0 && ` Registered on E-Wealth (Ref ${c.registrations.map((g: any) => g.ref_no).join(", ")}).`}
+        </p>
       )}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Stat label={asOn ? `AUM · ${dateLabel(asOn)}` : "AUM"} value={compact(snap?.aum_total ?? 0)} hint={money(snap?.aum_total ?? 0)} />
+        <Stat label="Invested" value={compact(snap?.inv_total ?? 0)} hint={money(snap?.inv_total ?? 0)} />
+        <Stat label="Gain / loss" value={compact(snap?.gain ?? 0)} tone={(snap?.gain ?? 0) >= 0 ? "up" : "down"} hint={pct(snap?.gain ?? 0, snap?.inv_total ?? 0)} />
+        <Stat label={`Activity · ${monthLabel(period)}`} value={compact(f.purchase.amount - f.redemption.amount)} hint={`${f.purchase.count} bought · ${f.redemption.count} redeemed · ${f.rejection.count} rejected`} />
+      </div>
 
-      <section className="card mt-6 overflow-hidden">
-        <div className="px-4 py-3 text-sm font-semibold">Month-wise</div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead><tr>
-              <th className="th">Month</th><th className="th num">Invested</th><th className="th num">AUM</th><th className="th num">Equity</th><th className="th num">Hybrid</th><th className="th num">Debt</th><th className="th num">Others</th>
-              <th className="th num">Purchases</th><th className="th num">Redeemed</th><th className="th num">Rejected</th>
-            </tr></thead>
-            <tbody>
-              {c.months.map((x: any) => (
-                <tr key={x.period} className={x.period === period ? "bg-navy-50/50" : ""}>
-                  <td className="td font-medium">{monthLabel(x.period)}</td>
-                  {x.active ? (<>
-                    <td className="td num">{money(x.inv_total)}</td><td className="td num font-medium">{money(x.aum_total)}</td>
-                    <td className="td num">{money(x.aum_equity)}</td><td className="td num">{money(x.aum_hybrid)}</td><td className="td num">{money(x.aum_debt)}</td><td className="td num">{money(x.aum_others + x.aum_physical)}</td>
-                  </>) : <td className="td text-center text-xs text-ink-faint" colSpan={6}>not in that month&apos;s AUM report</td>}
-                  <td className="td num">{x.purchase.count ? money(x.purchase.amount) : "–"}</td>
-                  <td className="td num">{x.redemption.count ? money(x.redemption.amount) : "–"}</td>
-                  <td className={`td num ${x.rejection.count ? "text-down" : ""}`}>{x.rejection.count ? money(x.rejection.amount) : "–"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      <div className="mt-6 grid gap-6 xl:grid-cols-[3fr_2fr]">
+        <section className="card overflow-hidden">
+          <div className="px-4 py-3 text-sm font-semibold">AUM by date</div>
+          {c.snapshots.length === 0 ? <Empty>Not in any AUM report yet.</Empty> : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead><tr>
+                  <th className="th">As on</th><th className="th num">Invested</th><th className="th num">AUM</th><th className="th num">Gain</th>
+                  <th className="th num">Equity</th><th className="th num">Hybrid</th><th className="th num">Debt</th><th className="th num">Others</th>
+                </tr></thead>
+                <tbody>
+                  {c.snapshots.map((x: any) => (
+                    <tr key={x.as_on} className={x.as_on === asOn ? "bg-navy-50/50" : ""}>
+                      <td className="td whitespace-nowrap font-medium">{dateLabel(x.as_on)}</td>
+                      <td className="td num">{money(x.inv_total)}</td><td className="td num font-medium">{money(x.aum_total)}</td>
+                      <td className={`td num ${x.gain < 0 ? "text-down" : x.gain > 0 ? "text-up" : ""}`}>{money(x.gain)}</td>
+                      <td className="td num">{money(x.aum_equity)}</td><td className="td num">{money(x.aum_hybrid)}</td><td className="td num">{money(x.aum_debt)}</td><td className="td num">{money(x.aum_others + x.aum_physical)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+        <section className="card overflow-hidden">
+          <div className="px-4 py-3 text-sm font-semibold">Transactions by month</div>
+          {c.months.length === 0 ? <Empty>No transactions.</Empty> : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead><tr><th className="th">Month</th><th className="th num">Purchases</th><th className="th num">Redeemed</th><th className="th num">Rejected</th></tr></thead>
+                <tbody>
+                  {c.months.map((x: any) => (
+                    <tr key={x.period} className={x.period === period ? "bg-navy-50/50" : ""}>
+                      <td className="td whitespace-nowrap font-medium">{monthLabel(x.period)}</td>
+                      <td className="td num">{x.purchase.count ? money(x.purchase.amount) : "–"}</td>
+                      <td className="td num">{x.redemption.count ? money(x.redemption.amount) : "–"}</td>
+                      <td className={`td num ${x.rejection.count ? "text-down" : ""}`}>{x.rejection.count ? money(x.rejection.amount) : "–"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      </div>
 
       <section className="card mt-6 overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
